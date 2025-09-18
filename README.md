@@ -149,8 +149,8 @@ This single command will:
    # Linux/macOS - Complete deployment (infrastructure + app)
    ./deploy-complete.sh
    
-   # Windows PowerShell
-   # Use deploy.ps1 then manually deploy app
+   # Windows PowerShell - Complete deployment (infrastructure + app)
+   .\deploy-complete.ps1
    ```
 
 #### Infrastructure-Only Deployment
@@ -159,8 +159,8 @@ This single command will:
 # Linux/macOS - Infrastructure only
 ./deploy.sh
 
-# Windows PowerShell
-./deploy.ps1
+# Windows PowerShell - Infrastructure only
+.\deploy.ps1
 ```
 
 ### Azure Resources Created

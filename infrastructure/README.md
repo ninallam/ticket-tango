@@ -86,18 +86,22 @@ After deployment:
 
 | Method | Command | Description |
 |--------|---------|-------------|
-| **Azure Developer CLI** | `azd up` | ✨ Recommended: Complete one-command deployment |
-| **Complete Deployment** | `./deploy-complete.sh` | Infrastructure + Application deployment |
-| **Infrastructure Only** | `./deploy.sh` | Traditional infrastructure-only deployment |
+| **Azure Developer CLI** | `azd up` | ✨ Recommended: Complete one-command deployment (cross-platform) |
+| **Complete Deployment (Linux/macOS)** | `./deploy-complete.sh` | Infrastructure + Application deployment |
+| **Complete Deployment (Windows)** | `.\deploy-complete.ps1` | Infrastructure + Application deployment |
+| **Infrastructure Only (Linux/macOS)** | `./deploy.sh` | Traditional infrastructure-only deployment |
+| **Infrastructure Only (Windows)** | `.\deploy.ps1` | Traditional infrastructure-only deployment |
 
 ### Azure Developer CLI Setup
 
-To use Azure Developer CLI:
+To use Azure Developer CLI (cross-platform support):
 
-1. **Install azd**: `curl -fsSL https://aka.ms/install-azd.sh | bash`
+1. **Install azd**: 
+   - Linux/macOS: `curl -fsSL https://aka.ms/install-azd.sh | bash`
+   - Windows: `winget install microsoft.azd` or download from [aka.ms/azd](https://aka.ms/azd)
 2. **Deploy**: `azd up`
 
-This creates a single Azure App Service that serves both the React frontend and Express.js backend API with proper routing.
+Azure Developer CLI automatically detects your platform and uses the appropriate scripts (shell scripts on Linux/macOS, PowerShell scripts on Windows). This creates a single Azure App Service that serves both the React frontend and Express.js backend API with proper routing.
 
 ## Costs
 
