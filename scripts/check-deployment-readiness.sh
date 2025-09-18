@@ -85,8 +85,8 @@ if [ "$all_files_exist" = true ] && [ "$yaml_valid" = true ]; then
     echo "✅ Repository is ready for GitHub Actions deployment!"
     echo ""
     echo "🔗 Next steps:"
-    echo "1. Set up Azure Service Principal (see DEPLOYMENT_GUIDE.md)"
-    echo "2. Configure GitHub secrets (AZURE_CREDENTIALS, SQL_ADMIN_LOGIN, SQL_ADMIN_PASSWORD)"
+    echo "1. Set up Azure App Registration with OIDC (see DEPLOYMENT_GUIDE.md)"
+    echo "2. Configure GitHub secrets (AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID, SQL_ADMIN_LOGIN, SQL_ADMIN_PASSWORD)"
     echo "3. Go to Actions tab and run 'Full Deployment Pipeline'"
 else
     echo "❌ Repository needs attention before deployment"
