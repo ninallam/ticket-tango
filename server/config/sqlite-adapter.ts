@@ -131,9 +131,9 @@ export class SQLiteAdapter implements DatabaseAdapter {
       
       // Insert test users (passwords are hashed 'password123')
       const users = [
-        ['testuser1', '$2a$10$rQZ8kZEGELhq9.6H6BK.K.cXwsM5q8YsGQhqzgGKPzHVJkO.KJHyO', 'test1@example.com'],
-        ['testuser2', '$2a$10$rQZ8kZEGELhq9.6H6BK.K.cXwsM5q8YsGQhqzgGKPzHVJkO.KJHyO', 'test2@example.com'],
-        ['admin', '$2a$10$rQZ8kZEGELhq9.6H6BK.K.cXwsM5q8YsGQhqzgGKPzHVJkO.KJHyO', 'admin@example.com']
+        ['testuser1', '$2a$10$sNapAUQLnhCfwC3Lz1WQkO3LhRPjEkcaokhx15AqDQa2Ul0jqN2p2', 'test1@example.com'],
+        ['testuser2', '$2a$10$sNapAUQLnhCfwC3Lz1WQkO3LhRPjEkcaokhx15AqDQa2Ul0jqN2p2', 'test2@example.com'],
+        ['admin', '$2a$10$sNapAUQLnhCfwC3Lz1WQkO3LhRPjEkcaokhx15AqDQa2Ul0jqN2p2', 'admin@example.com']
       ];
       
       for (const [username, password, email] of users) {
