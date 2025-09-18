@@ -62,38 +62,46 @@ jobs:
         $deploymentName = "tickettango-deployment-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
         "DEPLOYMENT_NAME=$deploymentName" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding UTF8
 
-    - name: Run Azure PowerShell deployment
-      uses: azure/powershell@v1
-      with:
-        azPSVersion: 'latest'
-        enable-AzPSSession: true
-        inlineScript: |
-          # create resource group (idempotent)
-          New-AzResourceGroup -Name $Env:AZURE_RESOURCE_GROUP -Location $Env:LOCATION -Force
-
-          # deploy Bicep template from infrastructure folder
-          Push-Location infrastructure
-
-          $deploymentResult = New-AzResourceGroupDeployment `
-            -ResourceGroupName $Env:AZURE_RESOURCE_GROUP `
-            -Name $Env:DEPLOYMENT_NAME `
-            -TemplateFile "main.bicep" `
-            -TemplateParameterObject @{
-              namePrefix = 'tickettango';
-              environment = $Env:ENVIRONMENT;
-              location = $Env:LOCATION;
-              sqlAdminLogin = $Env:SQL_ADMIN_LOGIN;
-              sqlAdminPassword = (ConvertTo-SecureString $Env:SQL_ADMIN_PASSWORD -AsPlainText -Force);
-              clientUrl = "";
-            }
-
-          # save deployment output to file
-          $deploymentResult | ConvertTo-Json -Depth 10 | Out-File -FilePath "deployment-output.json" -Encoding UTF8
-
-          Pop-Location
+    - name: Run Azure PowerShell deployment (pwsh only)
+      shell: pwsh
       env:
+        AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+        AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
         SQL_ADMIN_LOGIN: ${{ secrets.SQL_ADMIN_LOGIN }}
         SQL_ADMIN_PASSWORD: ${{ secrets.SQL_ADMIN_PASSWORD }}
+      run: |
+        # install Az modules if missing
+        if (-not (Get-Module -ListAvailable -Name Az)) {
+          Install-Module -Name Az -Scope CurrentUser -Force -AllowClobber -Repository PSGallery
+        }
+
+        # get an access token from the az CLI (azure/login step authenticated the runner for az)
+        $token = az account get-access-token --resource https://management.azure.com/ --query accessToken -o tsv
+        if (-not $token) { Write-Error "Failed to acquire access token from az"; exit 1 }
+
+        # connect Az PowerShell using the token
+        Connect-AzAccount -AccessToken $token -AccountId $Env:AZURE_CLIENT_ID -TenantId $Env:AZURE_TENANT_ID | Out-Null
+
+        # create resource group
+        New-AzResourceGroup -Name $Env:AZURE_RESOURCE_GROUP -Location $Env:LOCATION -Force
+
+        # deploy Bicep
+        Push-Location infrastructure
+        $deploymentResult = New-AzResourceGroupDeployment `
+          -ResourceGroupName $Env:AZURE_RESOURCE_GROUP `
+          -Name $Env:DEPLOYMENT_NAME `
+          -TemplateFile "main.bicep" `
+          -TemplateParameterObject @{
+            namePrefix = 'tickettango';
+            environment = $Env:ENVIRONMENT;
+            location = $Env:LOCATION;
+            sqlAdminLogin = $Env:SQL_ADMIN_LOGIN;
+            sqlAdminPassword = (ConvertTo-SecureString $Env:SQL_ADMIN_PASSWORD -AsPlainText -Force);
+            clientUrl = "";
+          }
+
+        $deploymentResult | ConvertTo-Json -Depth 10 | Out-File -FilePath "deployment-output.json" -Encoding UTF8
+        Pop-Location
 
     - name: Get deployment outputs
       id: outputs
