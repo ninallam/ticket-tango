@@ -55,51 +55,60 @@ jobs:
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
     - name: Set environment variables
+      shell: pwsh
       run: |
-        echo "ENVIRONMENT=${{ inputs.environment || 'dev' }}" >> $GITHUB_ENV
-        echo "LOCATION=${{ inputs.location || 'East US' }}" >> $GITHUB_ENV
-        echo "DEPLOYMENT_NAME=tickettango-deployment-$(date +%Y%m%d-%H%M%S)" >> $GITHUB_ENV
+        "ENVIRONMENT=${{ inputs.environment || 'dev' }}" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding UTF8
+        "LOCATION=${{ inputs.location || 'East US' }}" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding UTF8
+        $deploymentName = "tickettango-deployment-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+        "DEPLOYMENT_NAME=$deploymentName" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding UTF8
 
     - name: Create Resource Group
+      shell: pwsh
       run: |
-        az group create \
-          --name ${{ env.AZURE_RESOURCE_GROUP }} \
-          --location "${{ env.LOCATION }}"
+        New-AzResourceGroup `
+          -Name "${{ env.AZURE_RESOURCE_GROUP }}" `
+          -Location "${{ env.LOCATION }}" `
+          -Force
 
     - name: Deploy Bicep template
       id: deploy
+      shell: pwsh
       run: |
         cd infrastructure
-        az deployment group create \
-          --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-          --name ${{ env.DEPLOYMENT_NAME }} \
-          --template-file main.bicep \
-          --parameters namePrefix=tickettango \
-          --parameters environment=${{ env.ENVIRONMENT }} \
-          --parameters location="${{ env.LOCATION }}" \
-          --parameters sqlAdminLogin=${{ secrets.SQL_ADMIN_LOGIN }} \
-          --parameters sqlAdminPassword="${{ secrets.SQL_ADMIN_PASSWORD }}" \
-          --parameters clientUrl="" \
-          --output json > deployment-output.json
+        $deploymentResult = New-AzResourceGroupDeployment `
+          -ResourceGroupName "${{ env.AZURE_RESOURCE_GROUP }}" `
+          -Name "${{ env.DEPLOYMENT_NAME }}" `
+          -TemplateFile "main.bicep" `
+          -namePrefix "tickettango" `
+          -environment "${{ env.ENVIRONMENT }}" `
+          -location "${{ env.LOCATION }}" `
+          -sqlAdminLogin "${{ secrets.SQL_ADMIN_LOGIN }}" `
+          -sqlAdminPassword (ConvertTo-SecureString "${{ secrets.SQL_ADMIN_PASSWORD }}" -AsPlainText -Force) `
+          -clientUrl ""
+        
+        # Convert deployment result to JSON and save to file
+        $deploymentResult | ConvertTo-Json -Depth 10 | Out-File -FilePath "deployment-output.json" -Encoding UTF8
 
     - name: Get deployment outputs
       id: outputs
+      shell: pwsh
       run: |
         cd infrastructure
-        WEB_APP_URL=$(jq -r '.properties.outputs.webAppUrl.value' deployment-output.json)
-        WEB_APP_NAME=$(jq -r '.properties.outputs.webAppName.value' deployment-output.json)
-        SQL_SERVER_NAME=$(jq -r '.properties.outputs.sqlServerName.value' deployment-output.json)
+        $deploymentJson = Get-Content "deployment-output.json" | ConvertFrom-Json
+        $webAppUrl = $deploymentJson.Properties.Outputs.webAppUrl.Value
+        $webAppName = $deploymentJson.Properties.Outputs.webAppName.Value
+        $sqlServerName = $deploymentJson.Properties.Outputs.sqlServerName.Value
         
-        echo "web-app-url=$WEB_APP_URL" >> $GITHUB_OUTPUT
-        echo "web-app-name=$WEB_APP_NAME" >> $GITHUB_OUTPUT
-        echo "sql-server-name=$SQL_SERVER_NAME" >> $GITHUB_OUTPUT
+        "web-app-url=$webAppUrl" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding UTF8
+        "web-app-name=$webAppName" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding UTF8
+        "sql-server-name=$sqlServerName" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding UTF8
         
-        echo "### Deployment Summary 📋" >> $GITHUB_STEP_SUMMARY
-        echo "- **Web App URL**: $WEB_APP_URL" >> $GITHUB_STEP_SUMMARY
-        echo "- **Web App Name**: $WEB_APP_NAME" >> $GITHUB_STEP_SUMMARY
-        echo "- **SQL Server**: $SQL_SERVER_NAME" >> $GITHUB_STEP_SUMMARY
-        echo "- **Resource Group**: ${{ env.AZURE_RESOURCE_GROUP }}" >> $GITHUB_STEP_SUMMARY
-        echo "- **Environment**: ${{ env.ENVIRONMENT }}" >> $GITHUB_STEP_SUMMARY
+        "### Deployment Summary 📋" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding UTF8
+        "- **Web App URL**: $webAppUrl" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding UTF8
+        "- **Web App Name**: $webAppName" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding UTF8
+        "- **SQL Server**: $sqlServerName" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding UTF8
+        "- **Resource Group**: ${{ env.AZURE_RESOURCE_GROUP }}" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding UTF8
+        "- **Environment**: ${{ env.ENVIRONMENT }}" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding UTF8
 
     outputs:
       web-app-url: ${{ steps.outputs.outputs.web-app-url }}
