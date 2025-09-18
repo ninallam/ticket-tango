@@ -199,7 +199,13 @@ ticket-tango/
 ├── .github/workflows/    # GitHub Actions for deployment
 │   ├── deploy-infrastructure.yml
 │   ├── deploy-application.yml
-│   └── full-deployment.yml
+│   ├── full-deployment.yml
+│   ├── ci.yml
+│   └── README.md
+├── scripts/              # Deployment utilities
+│   └── check-deployment-readiness.sh
+├── startup.sh            # Azure App Service startup script
+├── DEPLOYMENT_GUIDE.md   # Quick deployment guide
 └── package.json          # Root package configuration
 ```
 
