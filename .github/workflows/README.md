@@ -46,31 +46,59 @@ Orchestrates both infrastructure and application deployment.
 
 ## Prerequisites
 
-### 1. Azure Service Principal
+### 1. Azure App Registration for OIDC
 
-Create an Azure Service Principal with appropriate permissions:
+Create an Azure App Registration with federated identity credentials for GitHub Actions:
 
 ```bash
+# Create Azure AD application
+az ad app create --display-name "tickettango-github-actions"
+
+# Get the application ID (client ID)
+APP_ID=$(az ad app list --display-name "tickettango-github-actions" --query "[0].appId" -o tsv)
+
 # Create service principal
-az ad sp create-for-rbac --name "tickettango-github-actions" --role contributor --scopes /subscriptions/{subscription-id}
+az ad sp create --id $APP_ID
+
+# Get object ID of the service principal
+SP_OBJECT_ID=$(az ad sp list --display-name "tickettango-github-actions" --query "[0].id" -o tsv)
+
+# Assign contributor role to the service principal
+az role assignment create --role contributor --assignee $SP_OBJECT_ID --scopes /subscriptions/{subscription-id}
 ```
 
-This will output JSON similar to:
-```json
-{
-  "clientId": "xxxx",
-  "clientSecret": "xxxx",
-  "subscriptionId": "xxxx",
-  "tenantId": "xxxx"
-}
+### 2. Configure Federated Identity Credentials
+
+Replace `{your-github-username}` with your actual GitHub username:
+
+```bash
+# Add federated credential for main branch
+az ad app federated-credential create --id $APP_ID --parameters '{
+  "name": "tickettango-main-branch",
+  "issuer": "https://token.actions.githubusercontent.com",
+  "subject": "repo:{your-github-username}/ticket-tango:ref:refs/heads/main",
+  "description": "GitHub Actions - Main Branch",
+  "audiences": ["api://AzureADTokenExchange"]
+}'
+
+# Add federated credential for pull requests
+az ad app federated-credential create --id $APP_ID --parameters '{
+  "name": "tickettango-pull-requests",
+  "issuer": "https://token.actions.githubusercontent.com",
+  "subject": "repo:{your-github-username}/ticket-tango:pull_request",
+  "description": "GitHub Actions - Pull Requests",
+  "audiences": ["api://AzureADTokenExchange"]
+}'
 ```
 
-### 2. GitHub Secrets
+### 3. GitHub Secrets
 
 Set up the following secrets in your GitHub repository:
 
 #### Required Secrets:
-- `AZURE_CREDENTIALS`: Complete JSON output from service principal creation
+- `AZURE_CLIENT_ID`: Application (client) ID from the app registration
+- `AZURE_TENANT_ID`: Your Azure tenant ID
+- `AZURE_SUBSCRIPTION_ID`: Your Azure subscription ID
 - `SQL_ADMIN_LOGIN`: SQL Server administrator username (e.g., `sqladmin`)
 - `SQL_ADMIN_PASSWORD`: Strong password for SQL Server administrator
 
@@ -155,10 +183,14 @@ Update the parameter files to customize:
 
 ### Common Issues
 
-1. **Authentication failures**: Verify `AZURE_CREDENTIALS` secret is correctly set
+1. **Authentication failures**: 
+   - Verify `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, and `AZURE_SUBSCRIPTION_ID` secrets are correctly set
+   - Ensure federated identity credentials are configured for your repository
+   - Check that the service principal has appropriate permissions
 2. **Resource naming conflicts**: Resources names must be globally unique
 3. **SQL password requirements**: Ensure password meets Azure SQL requirements
-4. **Permission issues**: Verify service principal has appropriate permissions
+4. **Permission issues**: Verify service principal has contributor role on the subscription
+5. **OIDC token exchange failures**: Verify the subject in federated credentials matches your repository path
 
 ### Logs and Monitoring
 
@@ -168,11 +200,13 @@ Update the parameter files to customize:
 
 ## Security Best Practices
 
-1. **Use GitHub Environments** for production deployments with required approvals
-2. **Rotate secrets regularly**, especially service principal credentials
-3. **Use least privilege principle** for service principal permissions
-4. **Enable branch protection** for main branch to require PR reviews
-5. **Monitor Azure resources** for unusual activity
+1. **Use OIDC authentication** instead of long-lived secrets for Azure authentication
+2. **Use GitHub Environments** for production deployments with required approvals
+3. **Configure federated identity credentials** with specific branch and repository restrictions
+4. **Use least privilege principle** for service principal permissions
+5. **Enable branch protection** for main branch to require PR reviews
+6. **Monitor Azure resources** for unusual activity
+7. **Regularly review** federated identity credentials and remove unused ones
 
 ## Customization
 
