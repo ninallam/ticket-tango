@@ -112,7 +112,26 @@ The application comes pre-loaded with exciting events:
 
 ## ☁️ Azure Deployment
 
-### One-Click Deployment
+### Automated Deployment with GitHub Actions (Recommended)
+
+1. **Set up Azure Service Principal**
+   ```bash
+   az ad sp create-for-rbac --name "tickettango-github-actions" \
+     --role contributor --scopes /subscriptions/{your-subscription-id}
+   ```
+
+2. **Configure GitHub Secrets**
+   - `AZURE_CREDENTIALS`: JSON output from service principal creation
+   - `SQL_ADMIN_LOGIN`: SQL Server admin username
+   - `SQL_ADMIN_PASSWORD`: Strong password for SQL admin
+
+3. **Deploy via GitHub Actions**
+   - Go to Actions tab → **Full Deployment Pipeline**
+   - Select environment (dev/staging/prod)
+   - Choose Azure region
+   - Run workflow
+
+### Manual Deployment
 
 1. **Configure Parameters**
    ```bash
@@ -177,6 +196,16 @@ ticket-tango/
 │   ├── main.bicep        # Main infrastructure template
 │   ├── parameters.json   # Deployment parameters
 │   └── deploy.sh         # Deployment script
+├── .github/workflows/    # GitHub Actions for deployment
+│   ├── deploy-infrastructure.yml
+│   ├── deploy-application.yml
+│   ├── full-deployment.yml
+│   ├── ci.yml
+│   └── README.md
+├── scripts/              # Deployment utilities
+│   └── check-deployment-readiness.sh
+├── startup.sh            # Azure App Service startup script
+├── DEPLOYMENT_GUIDE.md   # Quick deployment guide
 └── package.json          # Root package configuration
 ```
 
@@ -222,6 +251,8 @@ ticket-tango/
 - **Azure SQL Database** for data storage
 - **Azure Managed Identity** for secure authentication
 - **Application Insights** for monitoring
+- **Bicep** for infrastructure as code
+- **GitHub Actions** for automated deployment
 - **Bicep** for infrastructure as code
 
 ## 📈 Performance Optimizations
