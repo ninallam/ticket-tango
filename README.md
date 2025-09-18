@@ -17,11 +17,21 @@ A comprehensive ticket booking website for concerts and workshops built with mod
 - 🚀 **Modern Stack** - React with TypeScript frontend, Node.js with Express backend
 - 🔒 **Secure by Design** - JWT authentication, SQL injection protection, input validation
 - ☁️ **Azure Ready** - Complete Bicep infrastructure templates with managed identity
-- 🗄️ **SQL Database** - Azure SQL Database with automatic schema creation
+- 🗄️ **Dual Database Support** - SQLite for local development, Azure SQL Database for production
 - 📊 **API Documentation** - RESTful API with comprehensive endpoints
+- 🔧 **Easy Local Setup** - No database installation required for development
 
 ## 🏗️ Architecture
 
+### Local Development
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   React Client  │────│  Express API    │────│  SQLite DB      │
+│   (TypeScript)  │    │  (TypeScript)   │    │ (File-based)    │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+```
+
+### Production (Azure)
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   React Client  │────│  Express API    │────│ Azure SQL DB    │
@@ -53,7 +63,8 @@ A comprehensive ticket booking website for concerts and workshops built with mod
 2. **Environment Setup**
    ```bash
    cp .env.example .env
-   # Edit .env with your local database settings
+   # SQLite is used by default for local development (no additional setup required)
+   # To use MSSQL instead, set DB_TYPE=mssql in .env and configure database settings
    ```
 
 3. **Start Development Servers**
@@ -65,6 +76,8 @@ A comprehensive ticket booking website for concerts and workshops built with mod
    npm run dev:server  # Backend on http://localhost:3001
    npm run dev:client  # Frontend on http://localhost:3000
    ```
+   
+   **Note**: The SQLite database file (`database.sqlite`) will be created automatically on first run with sample data.
 
 4. **Access the Application**
    - Frontend: http://localhost:3000
@@ -73,6 +86,30 @@ A comprehensive ticket booking website for concerts and workshops built with mod
 ### Demo Credentials
 - **Username**: `testuser1` | **Password**: `password123`
 - **Username**: `testuser2` | **Password**: `password123`
+
+## 🗄️ Database Configuration
+
+### Local Development (Default: SQLite)
+- **Zero Configuration**: SQLite database is created automatically
+- **File Location**: `./database.sqlite` in the project root
+- **Sample Data**: Automatically populated with users and events
+- **No Installation Required**: Works out of the box
+
+### Local Development (Optional: MSSQL)
+To use SQL Server for local development:
+```bash
+# In your .env file
+DB_TYPE=mssql
+DB_SERVER=localhost
+DB_NAME=tickettango
+DB_USER=sa
+DB_PASSWORD=YourPassword123!
+```
+
+### Production (Azure SQL Database)
+- **Automatic Detection**: Uses MSSQL when `NODE_ENV=production`
+- **Managed Identity**: Secure authentication without connection strings
+- **Azure Integration**: Seamless deployment with infrastructure templates
 
 ## 🎪 Sample Events
 
@@ -241,14 +278,16 @@ ticket-tango/
 ### Backend  
 - **Node.js** with Express framework
 - **TypeScript** for type safety
-- **mssql** for Azure SQL Database connectivity
+- **Dual Database Support** - SQLite3 for local development, MSSQL for production
+- **Database Adapter Pattern** for seamless database switching
 - **jsonwebtoken** for authentication
 - **bcryptjs** for password hashing
 - **helmet** for security headers
 
 ### Infrastructure
 - **Azure App Service** for hosting
-- **Azure SQL Database** for data storage
+- **Azure SQL Database** for production data storage
+- **SQLite** for local development (zero configuration)
 - **Azure Managed Identity** for secure authentication
 - **Application Insights** for monitoring
 - **Bicep** for infrastructure as code
