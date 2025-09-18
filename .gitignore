@@ -49,10 +49,12 @@ coverage/
 # Azure deployment artifacts
 *.zip
 .azure/
+.azd/deploy/
 
 # Temporary files
 tmp/
 temp/
+deployment-temp/
 
 # Database files (for local development)
 *.db

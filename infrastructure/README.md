@@ -75,11 +75,29 @@ Update the `parameters.json` file with your desired configuration:
 
 After deployment:
 
-1. Configure any additional firewall rules if needed
-2. Set up CI/CD pipeline to deploy application code
-3. Configure custom domain and SSL certificate if required
-4. Set up monitoring and alerting
-5. Configure backup policies
+1. **Application is automatically deployed** - Visit the Web App URL to access your application
+2. Configure any additional firewall rules if needed
+3. Set up CI/CD pipeline for automatic deployments  
+4. Configure custom domain and SSL certificate if required
+5. Set up monitoring and alerting
+6. Configure backup policies
+
+## Deployment Options
+
+| Method | Command | Description |
+|--------|---------|-------------|
+| **Azure Developer CLI** | `azd up` | ✨ Recommended: Complete one-command deployment |
+| **Complete Deployment** | `./deploy-complete.sh` | Infrastructure + Application deployment |
+| **Infrastructure Only** | `./deploy.sh` | Traditional infrastructure-only deployment |
+
+### Azure Developer CLI Setup
+
+To use Azure Developer CLI:
+
+1. **Install azd**: `curl -fsSL https://aka.ms/install-azd.sh | bash`
+2. **Deploy**: `azd up`
+
+This creates a single Azure App Service that serves both the React frontend and Express.js backend API with proper routing.
 
 ## Costs
 

@@ -45,10 +45,16 @@ app.get('/api/health', (req, res) => {
 
 // Serve static files in production
 if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '../client')));
+  // Serve static files from public directory (Azure deployment structure)
+  app.use(express.static(path.join(__dirname, 'public')));
   
+  // Handle client-side routing for React app
   app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../client/index.html'));
+    // Don't serve index.html for API routes
+    if (req.path.startsWith('/api')) {
+      return res.status(404).json({ error: 'API route not found' });
+    }
+    res.sendFile(path.join(__dirname, 'public/index.html'));
   });
 }
 

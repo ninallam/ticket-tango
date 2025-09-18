@@ -112,7 +112,31 @@ The application comes pre-loaded with exciting events:
 
 ## ☁️ Azure Deployment
 
-### One-Click Deployment
+### One-Click Deployment with Azure Developer CLI
+
+The easiest way to deploy Ticket Tango is using Azure Developer CLI (azd):
+
+1. **Install Azure Developer CLI**
+   ```bash
+   # Install azd (if not already installed)
+   curl -fsSL https://aka.ms/install-azd.sh | bash
+   ```
+
+2. **Deploy Everything with One Command**
+   ```bash
+   azd up
+   ```
+
+This single command will:
+- 🏗️ Build both frontend and backend
+- 📦 Package the application for deployment
+- 🚀 Deploy infrastructure using Bicep templates
+- 🎯 Deploy application code to Azure App Service
+- ⚡ Configure all necessary settings
+
+### Traditional Azure CLI Deployment
+
+#### Complete Infrastructure + Application Deployment
 
 1. **Configure Parameters**
    ```bash
@@ -120,14 +144,24 @@ The application comes pre-loaded with exciting events:
    # Edit parameters.json with your preferences
    ```
 
-2. **Deploy to Azure**
+2. **Deploy Everything**
    ```bash
-   # Linux/macOS
-   ./deploy.sh
+   # Linux/macOS - Complete deployment (infrastructure + app)
+   ./deploy-complete.sh
    
    # Windows PowerShell
-   ./deploy.ps1
+   # Use deploy.ps1 then manually deploy app
    ```
+
+#### Infrastructure-Only Deployment
+
+```bash
+# Linux/macOS - Infrastructure only
+./deploy.sh
+
+# Windows PowerShell
+./deploy.ps1
+```
 
 ### Azure Resources Created
 
