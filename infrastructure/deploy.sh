@@ -136,7 +136,7 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
       </rules>
     </rewrite>
     <!-- Azure App Service will handle process.env.PORT -->
-    <iisnode node_env="%node_env%" 
+    <iisnode node_env="production" 
              nodeProcessCommandLine="&quot;%programfiles%\nodejs\node.exe&quot;"
              interceptor="&quot;%programfiles%\iisnode\interceptor.js&quot;" />
   </system.webServer>
