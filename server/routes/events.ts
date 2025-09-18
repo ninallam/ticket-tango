@@ -1,5 +1,5 @@
 import express from 'express';
-import { getPool } from '../config/database';
+import { QueryService } from '../services/query-service';
 
 const router = express.Router();
 
@@ -8,9 +8,6 @@ router.get('/', async (req, res) => {
   try {
     const { search, type, limit = '20', offset = '0' } = req.query;
     
-    const pool = getPool();
-    const request = pool.request();
-    
     let query = `
       SELECT id, title, description, type, venue, event_date, price, 
              available_tickets, total_tickets, image_url, created_at
@@ -18,39 +15,47 @@ router.get('/', async (req, res) => {
       WHERE 1=1
     `;
     
+    const params: { [key: string]: any } = {
+      offset: parseInt(offset as string),
+      limit: parseInt(limit as string)
+    };
+    
     if (search) {
       query += ` AND (title LIKE @search OR description LIKE @search OR venue LIKE @search)`;
-      request.input('search', `%${search}%`);
+      params.search = `%${search}%`;
     }
     
     if (type && (type === 'concert' || type === 'workshop')) {
       query += ` AND type = @type`;
-      request.input('type', type);
+      params.type = type;
     }
     
-    query += ` ORDER BY event_date ASC OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY`;
+    // Use database-specific pagination syntax
+    const paginationClause = QueryService.adaptQuery(
+      ` ORDER BY event_date ASC LIMIT @limit OFFSET @offset`,
+      ` ORDER BY event_date ASC OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY`
+    );
     
-    request.input('offset', parseInt(offset as string));
-    request.input('limit', parseInt(limit as string));
+    query += paginationClause;
     
-    const result = await request.query(query);
+    const result = await QueryService.queryWithNamedParams(query, params);
     
     // Get total count for pagination
     let countQuery = `SELECT COUNT(*) as total FROM events WHERE 1=1`;
-    const countRequest = pool.request();
+    const countParams: { [key: string]: any } = {};
     
     if (search) {
       countQuery += ` AND (title LIKE @search OR description LIKE @search OR venue LIKE @search)`;
-      countRequest.input('search', `%${search}%`);
+      countParams.search = `%${search}%`;
     }
     
     if (type && (type === 'concert' || type === 'workshop')) {
       countQuery += ` AND type = @type`;
-      countRequest.input('type', type);
+      countParams.type = type;
     }
     
-    const countResult = await countRequest.query(countQuery);
-    const total = countResult.recordset[0].total;
+    const countResult = await QueryService.queryWithNamedParams(countQuery, countParams);
+    const total = countResult.recordset[0].total || countResult.recordset[0].count;
     
     res.json({
       events: result.recordset,
@@ -73,17 +78,12 @@ router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
-    const pool = getPool();
-    const request = pool.request();
-    
-    const result = await request
-      .input('id', parseInt(id))
-      .query(`
-        SELECT id, title, description, type, venue, event_date, price, 
-               available_tickets, total_tickets, image_url, created_at
-        FROM events 
-        WHERE id = @id
-      `);
+    const result = await QueryService.queryWithNamedParams(`
+      SELECT id, title, description, type, venue, event_date, price, 
+             available_tickets, total_tickets, image_url, created_at
+      FROM events 
+      WHERE id = @id
+    `, { id: parseInt(id) });
     
     if (result.recordset.length === 0) {
       return res.status(404).json({ error: 'Event not found' });
@@ -100,16 +100,22 @@ router.get('/:id', async (req, res) => {
 // Get featured events (upcoming, popular)
 router.get('/featured/upcoming', async (req, res) => {
   try {
-    const pool = getPool();
-    const request = pool.request();
-    
-    const result = await request.query(`
-      SELECT TOP 6 id, title, description, type, venue, event_date, price, 
+    // Use database-specific query for getting top records
+    const query = QueryService.adaptQuery(
+      `SELECT id, title, description, type, venue, event_date, price, 
+             available_tickets, total_tickets, image_url
+      FROM events 
+      WHERE event_date > datetime('now') AND available_tickets > 0
+      ORDER BY event_date ASC
+      LIMIT 6`,
+      `SELECT TOP 6 id, title, description, type, venue, event_date, price, 
              available_tickets, total_tickets, image_url
       FROM events 
       WHERE event_date > GETDATE() AND available_tickets > 0
-      ORDER BY event_date ASC
-    `);
+      ORDER BY event_date ASC`
+    );
+    
+    const result = await QueryService.query(query);
     
     res.json(result.recordset);
     

@@ -1,6 +1,6 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
-import { getPool } from '../config/database';
+import { QueryService } from '../services/query-service';
 import { generateToken } from '../middleware/auth';
 
 const router = express.Router();
@@ -14,13 +14,11 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'Username and password are required' });
     }
 
-    const pool = getPool();
-    const request = pool.request();
-
     // Check if user already exists
-    const existingUser = await request
-      .input('username', username)
-      .query('SELECT id FROM users WHERE username = @username');
+    const existingUser = await QueryService.queryWithNamedParams(
+      'SELECT id FROM users WHERE username = @username',
+      { username }
+    );
 
     if (existingUser.recordset.length > 0) {
       return res.status(400).json({ error: 'Username already exists' });
@@ -30,17 +28,33 @@ router.post('/register', async (req, res) => {
     const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-    // Insert new user
-    const result = await request
-      .input('hashedPassword', hashedPassword)
-      .input('email', email || null)
-      .query(`
-        INSERT INTO users (username, password, email) 
-        OUTPUT INSERTED.id, INSERTED.username
-        VALUES (@username, @hashedPassword, @email)
-      `);
+    // Insert new user - handle database-specific syntax for returning inserted data
+    const insertQuery = QueryService.adaptQuery(
+      `INSERT INTO users (username, password, email) VALUES (@username, @hashedPassword, @email)`,
+      `INSERT INTO users (username, password, email) 
+       OUTPUT INSERTED.id, INSERTED.username
+       VALUES (@username, @hashedPassword, @email)`
+    );
 
-    const newUser = result.recordset[0];
+    const result = await QueryService.queryWithNamedParams(insertQuery, {
+      username,
+      hashedPassword,
+      email: email || null
+    });
+
+    let newUser;
+    if (result.recordset && result.recordset.length > 0) {
+      // MSSQL with OUTPUT clause
+      newUser = result.recordset[0];
+    } else {
+      // SQLite - need to get the inserted user separately
+      const userResult = await QueryService.queryWithNamedParams(
+        'SELECT id, username FROM users WHERE username = @username',
+        { username }
+      );
+      newUser = userResult.recordset[0];
+    }
+
     const token = generateToken(newUser);
 
     res.status(201).json({
@@ -67,13 +81,11 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Username and password are required' });
     }
 
-    const pool = getPool();
-    const request = pool.request();
-
     // Find user
-    const result = await request
-      .input('username', username)
-      .query('SELECT id, username, password FROM users WHERE username = @username');
+    const result = await QueryService.queryWithNamedParams(
+      'SELECT id, username, password FROM users WHERE username = @username',
+      { username }
+    );
 
     if (result.recordset.length === 0) {
       return res.status(401).json({ error: 'Invalid credentials' });

@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@azure/identity": "^4.0.1",
+    "@types/sqlite3": "^3.1.11",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
@@ -24,7 +25,8 @@
     "express-rate-limit": "^7.1.5",
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
-    "mssql": "^10.0.1"
+    "mssql": "^10.0.1",
+    "sqlite3": "^5.1.7"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
