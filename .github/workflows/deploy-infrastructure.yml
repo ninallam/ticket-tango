@@ -1,0 +1,101 @@
+name: Deploy Infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      location:
+        description: 'Azure region'
+        required: true
+        default: 'East US'
+        type: string
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+      location:
+        required: true
+        type: string
+  push:
+    branches:
+      - main
+    paths:
+      - 'infrastructure/**'
+
+env:
+  AZURE_RESOURCE_GROUP: 'tickettango-rg'
+
+jobs:
+  deploy-infrastructure:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment || 'dev' }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Set environment variables
+      run: |
+        echo "ENVIRONMENT=${{ inputs.environment || 'dev' }}" >> $GITHUB_ENV
+        echo "LOCATION=${{ inputs.location || 'East US' }}" >> $GITHUB_ENV
+        echo "DEPLOYMENT_NAME=tickettango-deployment-$(date +%Y%m%d-%H%M%S)" >> $GITHUB_ENV
+
+    - name: Create Resource Group
+      run: |
+        az group create \
+          --name ${{ env.AZURE_RESOURCE_GROUP }} \
+          --location "${{ env.LOCATION }}"
+
+    - name: Deploy Bicep template
+      id: deploy
+      run: |
+        cd infrastructure
+        az deployment group create \
+          --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+          --name ${{ env.DEPLOYMENT_NAME }} \
+          --template-file main.bicep \
+          --parameters namePrefix=tickettango \
+          --parameters environment=${{ env.ENVIRONMENT }} \
+          --parameters location="${{ env.LOCATION }}" \
+          --parameters sqlAdminLogin=${{ secrets.SQL_ADMIN_LOGIN }} \
+          --parameters sqlAdminPassword="${{ secrets.SQL_ADMIN_PASSWORD }}" \
+          --parameters clientUrl="" \
+          --output json > deployment-output.json
+
+    - name: Get deployment outputs
+      id: outputs
+      run: |
+        cd infrastructure
+        WEB_APP_URL=$(jq -r '.properties.outputs.webAppUrl.value' deployment-output.json)
+        WEB_APP_NAME=$(jq -r '.properties.outputs.webAppName.value' deployment-output.json)
+        SQL_SERVER_NAME=$(jq -r '.properties.outputs.sqlServerName.value' deployment-output.json)
+        
+        echo "web-app-url=$WEB_APP_URL" >> $GITHUB_OUTPUT
+        echo "web-app-name=$WEB_APP_NAME" >> $GITHUB_OUTPUT
+        echo "sql-server-name=$SQL_SERVER_NAME" >> $GITHUB_OUTPUT
+        
+        echo "### Deployment Summary 📋" >> $GITHUB_STEP_SUMMARY
+        echo "- **Web App URL**: $WEB_APP_URL" >> $GITHUB_STEP_SUMMARY
+        echo "- **Web App Name**: $WEB_APP_NAME" >> $GITHUB_STEP_SUMMARY
+        echo "- **SQL Server**: $SQL_SERVER_NAME" >> $GITHUB_STEP_SUMMARY
+        echo "- **Resource Group**: ${{ env.AZURE_RESOURCE_GROUP }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Environment**: ${{ env.ENVIRONMENT }}" >> $GITHUB_STEP_SUMMARY
+
+    outputs:
+      web-app-url: ${{ steps.outputs.outputs.web-app-url }}
+      web-app-name: ${{ steps.outputs.outputs.web-app-name }}
+      sql-server-name: ${{ steps.outputs.outputs.sql-server-name }}
