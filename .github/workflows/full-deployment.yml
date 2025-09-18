@@ -27,7 +27,9 @@ on:
         required: true
         default: true
         type: boolean
-
+permissions:
+  id-token: write
+  contents: read
 jobs:
   deploy-infrastructure:
     if: ${{ inputs.deploy_infrastructure }}
