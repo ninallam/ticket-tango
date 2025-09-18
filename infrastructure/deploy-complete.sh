@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Azure Deployment Script for Ticket Tango
-# This script deploys the infrastructure to Azure using Bicep templates
+# Complete Azure deployment script for Ticket Tango
+# This script handles both infrastructure and application deployment
 
 set -e
 
@@ -10,7 +10,31 @@ RESOURCE_GROUP_NAME="tickettango-rg"
 LOCATION="East US"
 DEPLOYMENT_NAME="tickettango-deployment-$(date +%Y%m%d-%H%M%S)"
 
-echo "🚀 Starting Azure deployment for Ticket Tango..."
+echo "🚀 Starting complete Azure deployment for Ticket Tango..."
+echo ""
+
+# Check for Azure Developer CLI first
+if command -v azd &> /dev/null; then
+    echo "✨ Azure Developer CLI found! Using azd for deployment..."
+    read -p "Do you want to use Azure Developer CLI (azd) for deployment? (y/N): " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        echo "🔧 Using Azure Developer CLI for complete deployment..."
+        
+        # Initialize azd if needed
+        if [ ! -f ".azure/environments/.env" ]; then
+            echo "📋 Initializing Azure Developer CLI environment..."
+            azd init --location "$LOCATION"
+        fi
+        
+        # Deploy everything with azd
+        azd up
+        exit 0
+    fi
+fi
+
+echo "🔧 Using traditional Azure CLI deployment..."
+echo ""
 
 # Check if Azure CLI is installed
 if ! command -v az &> /dev/null; then
@@ -80,32 +104,28 @@ echo ""
 echo "✅ Infrastructure deployment completed successfully!"
 echo ""
 
-# Check if user wants to deploy application code
-read -p "Do you want to deploy the application code now? (y/N): " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    echo "🏗️  Building and deploying application..."
-    
-    # Build the application
-    echo "📦 Building application..."
-    cd ..
-    npm run build
-    
-    # Create deployment package
-    echo "📦 Creating deployment package..."
-    mkdir -p deployment-temp
-    
-    # Copy server build files
-    cp -r dist/server/* deployment-temp/
-    cp package.json deployment-temp/
-    cp package-lock.json deployment-temp/
-    
-    # Copy client build files to static directory
-    mkdir -p deployment-temp/public
-    cp -r client/build/* deployment-temp/public/
-    
-    # Create web.config for Azure App Service
-    cat > deployment-temp/web.config << 'EOF'
+# Deploy application code automatically
+echo "🏗️  Building and deploying application..."
+
+# Build the application
+echo "📦 Building application..."
+cd ..
+npm run build
+
+# Create deployment package for combined app
+echo "📦 Creating combined deployment package..."
+mkdir -p deployment-temp
+
+# Copy server build files
+cp -r dist/server/* deployment-temp/
+cp package.json deployment-temp/
+
+# Copy client build files to public directory for serving
+mkdir -p deployment-temp/public
+cp -r client/build/* deployment-temp/public/
+
+# Create web.config for proper routing
+cat > deployment-temp/web.config << 'EOF'
 <?xml version="1.0" encoding="utf-8"?>
 <configuration>
   <system.webServer>
@@ -115,36 +135,36 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     <rewrite>
       <rules>
         <!-- Handle static files -->
-        <rule name="StaticContent">
-          <action type="Rewrite" url="public{REQUEST_URI}"/>
+        <rule name="StaticContent" stopProcessing="true">
+          <match url="^public/(.*)"/>
+          <action type="Rewrite" url="public/{R:1}"/>
         </rule>
         <!-- Handle API routes -->
         <rule name="API" stopProcessing="true">
-          <match url="^api/.*"/>
+          <match url="^api/(.*)"/>
           <action type="Rewrite" url="index.js"/>
         </rule>
-        <!-- Handle client-side routing -->
-        <rule name="React Routes" stopProcessing="true">
+        <!-- Handle client-side routing - serve index.html for non-API routes -->
+        <rule name="SPA" stopProcessing="true">
           <match url=".*"/>
           <conditions logicalGrouping="MatchAll">
             <add input="{REQUEST_FILENAME}" matchType="IsFile" negate="true"/>
             <add input="{REQUEST_FILENAME}" matchType="IsDirectory" negate="true"/>
-            <add input="{REQUEST_URI}" pattern="^/(api)" negate="true"/>
+            <add input="{REQUEST_URI}" pattern="^/(api|public)" negate="true"/>
           </conditions>
-          <action type="Rewrite" url="/public/index.html"/>
+          <action type="Rewrite" url="public/index.html"/>
         </rule>
       </rules>
     </rewrite>
-    <!-- Azure App Service will handle process.env.PORT -->
     <iisnode node_env="production" 
              nodeProcessCommandLine="&quot;%programfiles%\nodejs\node.exe&quot;"
              interceptor="&quot;%programfiles%\iisnode\interceptor.js&quot;" />
   </system.webServer>
 </configuration>
 EOF
-    
-    # Create package.json for production deployment
-    cat > deployment-temp/package.json << 'EOF'
+
+# Create production package.json
+cat > deployment-temp/package.json << 'EOF'
 {
   "name": "ticket-tango",
   "version": "1.0.0",
@@ -166,32 +186,28 @@ EOF
   }
 }
 EOF
-    
-    # Create deployment ZIP
-    cd deployment-temp
-    zip -r ../app.zip . > /dev/null
-    cd ..
-    
-    # Deploy to Azure App Service
-    echo "🚀 Deploying to Azure App Service..."
-    az webapp deployment source config-zip \
-        --resource-group $RESOURCE_GROUP_NAME \
-        --name $WEB_APP_NAME \
-        --src app.zip \
-        --timeout 600
-    
-    # Cleanup
-    rm -rf deployment-temp app.zip
-    
-    # Back to infrastructure directory
-    cd infrastructure
-    
-    echo ""
-    echo "🎉 Application deployed successfully!"
-else
-    echo "⏭️  Skipping application deployment."
-fi
 
+# Create deployment ZIP
+cd deployment-temp
+zip -r ../app.zip . > /dev/null
+cd ..
+
+# Deploy to Azure App Service
+echo "🚀 Deploying to Azure App Service..."
+az webapp deployment source config-zip \
+    --resource-group $RESOURCE_GROUP_NAME \
+    --name $WEB_APP_NAME \
+    --src app.zip \
+    --timeout 600
+
+# Cleanup
+rm -rf deployment-temp app.zip
+
+# Back to infrastructure directory
+cd infrastructure
+
+echo ""
+echo "🎉 Complete deployment finished successfully!"
 echo ""
 echo "📋 Deployment Summary:"
 echo "   Web App URL: $WEB_APP_URL"
@@ -205,10 +221,13 @@ echo "   2. Configure CI/CD pipeline for automatic deployments"
 echo "   3. Set up custom domain (optional)"
 echo "   4. Configure monitoring and alerts"
 echo ""
-echo "💡 For future deployments, you can use:"
-echo "   # Infrastructure + Application (full deployment)"
-echo "   ./deploy.sh"
+echo "💡 For future deployments:"
+echo "   # Complete infrastructure + application deployment"
+echo "   ./deploy-complete.sh"
 echo ""
-echo "   # Or use Azure Developer CLI:"
+echo "   # Azure Developer CLI (if available)"
 echo "   azd up"
+echo ""
+echo "   # Infrastructure only"
+echo "   ./deploy.sh"
 echo ""

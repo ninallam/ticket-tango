@@ -1,0 +1,41 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+
+name: ticket-tango
+metadata:
+  template: ticket-tango@0.0.1-beta
+services:
+  app:
+    project: .
+    language: js
+    host: appservice
+    dist: .azd/deploy
+
+infra:
+  provider: bicep
+  path: ./infrastructure
+
+hooks:
+  preprovision:
+    windows:
+      shell: pwsh
+      run: .azd/hooks/preprovision.ps1
+      continueOnError: false
+    posix:
+      shell: sh
+      run: .azd/hooks/preprovision.sh
+      continueOnError: false
+  predeploy:
+    windows:
+      shell: pwsh
+      run: .azd/hooks/predeploy.ps1
+      continueOnError: false
+    posix:
+      shell: sh
+      run: .azd/hooks/predeploy.sh
+      continueOnError: false
+
+workflows:
+  up:
+    steps:
+      - azd: provision
+      - azd: deploy
