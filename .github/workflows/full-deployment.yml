@@ -1,0 +1,47 @@
+name: Full Deployment Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      location:
+        description: 'Azure region'
+        required: true
+        default: 'East US'
+        type: string
+      deploy_infrastructure:
+        description: 'Deploy infrastructure'
+        required: true
+        default: true
+        type: boolean
+      deploy_application:
+        description: 'Deploy application'
+        required: true
+        default: true
+        type: boolean
+
+jobs:
+  deploy-infrastructure:
+    if: ${{ inputs.deploy_infrastructure }}
+    uses: ./.github/workflows/deploy-infrastructure.yml
+    with:
+      environment: ${{ inputs.environment }}
+      location: ${{ inputs.location }}
+    secrets: inherit
+
+  deploy-application:
+    if: ${{ inputs.deploy_application }}
+    needs: [deploy-infrastructure]
+    # Run even if infrastructure deployment was skipped
+    uses: ./.github/workflows/deploy-application.yml
+    with:
+      environment: ${{ inputs.environment }}
+    secrets: inherit

@@ -1,0 +1,157 @@
+name: Build and Deploy Application
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+  push:
+    branches:
+      - main
+    paths:
+      - 'client/**'
+      - 'server/**'
+      - 'package.json'
+      - 'package-lock.json'
+
+env:
+  AZURE_RESOURCE_GROUP: 'tickettango-rg'
+  NODE_VERSION: '18'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment || 'dev' }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm run install:all
+
+    - name: Build application
+      run: npm run build
+
+    - name: Create deployment package
+      run: |
+        # Create deployment directory
+        mkdir -p deployment-package
+        
+        # Copy server build output
+        cp -r dist deployment-package/
+        
+        # Copy client build output to serve as static files
+        cp -r client/build deployment-package/dist/client
+        
+        # Copy package.json for production dependencies
+        cp package.json deployment-package/
+        cp package-lock.json deployment-package/
+        
+        # Create web.config for Azure App Service
+        cat > deployment-package/web.config << 'EOF'
+        <?xml version="1.0" encoding="utf-8"?>
+        <configuration>
+          <system.webServer>
+            <webSocket enabled="false" />
+            <handlers>
+              <add name="iisnode" path="dist/server/index.js" verb="*" modules="iisnode"/>
+            </handlers>
+            <rewrite>
+              <rules>
+                <rule name="NodeInspector" patternSyntax="ECMAScript" stopProcessing="true">
+                  <match url="^dist/server/index.js\/debug[\/]?" />
+                </rule>
+                <rule name="StaticContent" patternSyntax="Wildcard" stopProcessing="true">
+                  <match url="*" />
+                  <conditions>
+                    <add input="{REQUEST_FILENAME}" matchType="IsFile" />
+                  </conditions>
+                </rule>
+                <rule name="DynamicContent">
+                  <match url="/*" />
+                  <conditions>
+                    <add input="{REQUEST_FILENAME}" matchType="IsFile" negate="True"/>
+                  </conditions>
+                  <action type="Rewrite" url="dist/server/index.js"/>
+                </rule>
+              </rules>
+            </rewrite>
+            <security>
+              <requestFiltering>
+                <hiddenSegments>
+                  <remove segment="bin"/>
+                </hiddenSegments>
+              </requestFiltering>
+            </security>
+            <httpErrors existingResponse="PassThrough" />
+            <iisnode watchedFiles="web.config;*.js"/>
+          </system.webServer>
+        </configuration>
+        EOF
+        
+        # Create startup script for Azure App Service
+        cat > deployment-package/startup.sh << 'EOF'
+        #!/bin/bash
+        cd /home/site/wwwroot
+        npm install --production
+        node dist/server/index.js
+        EOF
+        chmod +x deployment-package/startup.sh
+        
+        # Create ZIP file for deployment
+        cd deployment-package
+        zip -r ../app-deployment.zip .
+        cd ..
+
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Get Web App Name
+      id: get-webapp
+      run: |
+        ENVIRONMENT=${{ inputs.environment || 'dev' }}
+        WEB_APP_NAME="tickettango-${ENVIRONMENT}-app"
+        echo "web-app-name=$WEB_APP_NAME" >> $GITHUB_OUTPUT
+
+    - name: Deploy to Azure App Service
+      uses: azure/webapps-deploy@v2
+      with:
+        app-name: ${{ steps.get-webapp.outputs.web-app-name }}
+        package: ./app-deployment.zip
+
+    - name: Check deployment status
+      run: |
+        WEB_APP_NAME=${{ steps.get-webapp.outputs.web-app-name }}
+        WEB_APP_URL="https://${WEB_APP_NAME}.azurewebsites.net"
+        
+        echo "### Deployment Summary 🚀" >> $GITHUB_STEP_SUMMARY
+        echo "- **Application URL**: $WEB_APP_URL" >> $GITHUB_STEP_SUMMARY
+        echo "- **Web App Name**: $WEB_APP_NAME" >> $GITHUB_STEP_SUMMARY
+        echo "- **Environment**: ${{ inputs.environment || 'dev' }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Build Date**: $(date)" >> $GITHUB_STEP_SUMMARY
+        
+        echo "🔗 **Next Steps:**" >> $GITHUB_STEP_SUMMARY
+        echo "1. Verify application is running at $WEB_APP_URL" >> $GITHUB_STEP_SUMMARY
+        echo "2. Check Application Insights for monitoring data" >> $GITHUB_STEP_SUMMARY
+        echo "3. Configure custom domain if needed" >> $GITHUB_STEP_SUMMARY
