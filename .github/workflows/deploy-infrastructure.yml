@@ -65,6 +65,7 @@ jobs:
     - name: Run Azure PowerShell deployment
       uses: azure/powershell@v1
       with:
+        azPSVersion: 'latest'
         inlineScript: |
           # create resource group (idempotent)
           New-AzResourceGroup -Name $Env:AZURE_RESOURCE_GROUP -Location $Env:LOCATION -Force
