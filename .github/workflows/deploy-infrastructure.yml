@@ -100,7 +100,8 @@ jobs:
             clientUrl = "";
           }
 
-        $deploymentResult | ConvertTo-Json -Depth 10 | Out-File -FilePath "deployment-output.json" -Encoding UTF8
+        # save only deployment properties (avoid serializing SecureString)
+        $deploymentResult.Properties | ConvertTo-Json -Depth 10 | Out-File -FilePath "deployment-output.json" -Encoding UTF8
         Pop-Location
 
     - name: Get deployment outputs
